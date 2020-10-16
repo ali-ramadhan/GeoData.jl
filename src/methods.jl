@@ -29,12 +29,18 @@ The array returned from calling `boolmask` on a `AbstractGeoArray` is a
 [`GeoArray`](@ref) with the same size and fields as the oridingl array
 """
 function boolmask end
-boolmask(A::AbstractGeoArray) =
-    rebuild(A; data=boolmask(A, missingval(A)), missingval=false, name=:Bool_mask)
-boolmask(A::AbstractArray, missingval::Missing=missing) =
-    (x -> !ismissing(x)).(parent(A))
+
+boolmask(A::AbstractArray) = boolmask(A, missingval(A))
+boolmask(A::AbstractGeoArray, missingval) = _boolmask(A, missingval)
+boolmask(A::AbstractGeoArray, ::Missing) = _boolmask(A, missing)
+# Need to catch NaN and missing with === as isapprox will miss them
 boolmask(A::AbstractArray, missingval) =
-    (x -> !isapprox(x, missingval)).(parent(A))
+    (x -> !(isapprox(x, missingval) || x === missingval)).(parent(A))
+boolmask(A::AbstractArray, ::Missing) = (x -> x !== missing).(parent(A))
+
+# Avoids ambiguity with AbstractArray methods
+_boolmask(A::AbstractGeoArray, missingval) =
+    rebuild(A; data=boolmask(parent(A), missingval), missingval=false, name=:boolmask)
 
 """
     missingmask(A::AbstractArray, [missingval])
@@ -47,9 +53,14 @@ The array returned from calling `boolmask` on a `AbstractGeoArray` is a
 [`GeoArray`](@ref) with the same size and fields as the oridingl array
 """
 function missingmask end
-missingmask(A::AbstractGeoArray) =
-    rebuild(A; data=missingmask(A, missingval(A)), missingval=missing, name=:Missing_mask)
-missingmask(A::AbstractArray, missingval::Missing=missing) =
-    (a -> ismissing(a) ? missing : true).(parent(A))
+missingmask(A::AbstractArray) = missingmask(A, missingval(A))
+missingmask(A::AbstractGeoArray, missingval) = _missingmask(A, missingval)
+missingmask(A::AbstractGeoArray, missingval::Missing) = _missingmask(A, missingval)
 missingmask(A::AbstractArray, missingval) =
-    (a -> isapprox(a, missingval) ? missing : true).(parent(A))
+    (x -> isapprox(x, missingval) || x === missingval ? missing : true).(parent(A))
+missingmask(A::AbstractArray, missingval::Missing) =
+    (x -> x === missingval ? missing : true).(parent(A))
+
+# Avoids ambiguity with AbstractArray methods
+_missingmask(A::AbstractGeoArray, missingval) =
+    rebuild(A; data=missingmask(parent(A), missingval), missingval=missing, name=:missingmask)
