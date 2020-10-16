@@ -44,11 +44,11 @@ path = maybedownload("https://download.osgeo.org/geotiff/samples/gdal_eg/cea.tif
         @test_throws ErrorException mappedcrs(gdalarray[Lat(1), Lon(1)])
         wkt = WellKnownText(GeoFormatTypes.CRS(), 
           "PROJCS[\"unnamed\",GEOGCS[\"NAD27\",DATUM[\"North_American_Datum_1927\",SPHEROID[\"Clarke 1866\",6378206.4,294.978698213898,AUTHORITY[\"EPSG\",\"7008\"]],AUTHORITY[\"EPSG\",\"6267\"]],PRIMEM[\"Greenwich\",0],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4267\"]],PROJECTION[\"Cylindrical_Equal_Area\"],PARAMETER[\"standard_parallel_1\",33.75],PARAMETER[\"central_meridian\",-117.333333333333],PARAMETER[\"false_easting\",0],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH]]")
-        @test crs(dims(gdalarray, Lat)) == wkt
-        @test crs(dims(gdalarray, Lon)) == wkt
-        @test crs(gdalarray) == wkt
-        @test crs(gdalarray[Lat(1)]) == wkt
-        @test_throws ErrorException crs(gdalarray[Lat(1), Lon(1)])
+        @test projectedcrs(dims(gdalarray, Lat)) == wkt
+        @test projectedcrs(dims(gdalarray, Lon)) == wkt
+        @test projectedcrs(gdalarray) == wkt
+        @test projectedcrs(gdalarray[Lat(1)]) == wkt
+        @test_throws ErrorException projectedcrs(gdalarray[Lat(1), Lon(1)])
     end
 
     @testset "indexing" begin 
@@ -84,38 +84,27 @@ path = maybedownload("https://download.osgeo.org/geotiff/samples/gdal_eg/cea.tif
     end
 
     @testset "save" begin
-<<<<<<< HEAD
-        gdalarray = GDALarray(path; usercrs=EPSG(4326), name=:test);
-=======
-        gdalarray = GDALarray(path; mappedcrs=EPSG(4326));
->>>>>>> 6c902b6... use projectedcrs and mappedcrs as crs names
+        gdalarray = GDALarray(path; mappedcrs=EPSG(4326), name=:test);
 
         @testset "2d" begin
             geoarray1 = gdalarray[Band(1)]
             filename = tempname() * ".tif"
             write(filename, GDALarray, geoarray1)
-<<<<<<< HEAD
-            saved1 = GDALarray(filename; usercrs=EPSG(4326))[Band(1)];
-            @test all(saved1 .== geoarray1)
-=======
             saved1 = GDALarray(filename; mappedcrs=EPSG(4326))[Band(1)];
-            dims(saved1)
             @test saved1 == geoarray1
->>>>>>> 6c902b6... use projectedcrs and mappedcrs as crs names
             @test typeof(saved1) == typeof(geoarray1)
             @test val(dims(saved1, Lon)) == val(dims(geoarray1, Lon))
             @test val(dims(saved1, Lat)) == val(dims(geoarray1, Lat))
             @test all(metadata.(dims(saved1)) .== metadata.(dims(geoarray1)))
-            @test missingval(saved1) === missingval(geoarray1)
-            @test refdims(saved1) == refdims(geoarray1)
-        end
+            @test missingval(saved1) === missingval(geoarray1) 
+            @test refdims(saved1) == refdims(geoarray1) end
         
         @testset "3d, with subsetting" begin
             geoarray2 = gdalarray[Lat(Between(33.7, 33.9)), 
                                   Lon(Between(-117.6, -117.4))]
             filename2 = tempname() * ".img"
             write(filename2, GDALarray, geoarray2)
-            saved2 = GeoArray(GDALarray(filename2; name=:test, usercrs=EPSG(4326)))
+            saved2 = GeoArray(GDALarray(filename2; name=:test, mappedcrs=EPSG(4326)))
             @test size(saved2) == size(geoarray2) == length.(dims(saved2)) == length.(dims(geoarray2))
             @test refdims(saved2) == refdims(geoarray2)
             #TODO test a file with more metadata
@@ -150,7 +139,7 @@ path = maybedownload("https://download.osgeo.org/geotiff/samples/gdal_eg/cea.tif
         @testset "to grd" begin
             write("testgrd", GRDarray, gdalarray)
             grdarray = GRDarray("testgrd")
-            @test crs(grdarray) == convert(ProjString, crs(gdalarray))
+            @test projectedcrs(grdarray) == convert(ProjString, projectedcrs(gdalarray))
             @test bounds(grdarray) == (bounds(gdalarray))
             @test val(dims(grdarray, Lat)) == reverse(val(dims(gdalarray, Lat)))
             @test val(dims(grdarray, Lon)) ≈ val(dims(gdalarray, Lon))
