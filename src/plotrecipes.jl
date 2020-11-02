@@ -28,7 +28,7 @@ end
                 aspect_ratio := 1
                 subplot := i
                 slice = A[:, :, i]
-                lats, lons = map(preparedim, dims(slice))
+                lats, lons = map(prepare, dims(slice))
                 lons, lats, parent(slice)
             end
         end
@@ -48,7 +48,7 @@ end
     :aspect_ratio --> 1
     :colorbar_title --> name(A)
     :title --> refdims_title(A)
-    lats, lons = map(preparedim, dims(A))
+    lats, lons = map(prepare, dims(A))
     lons, lats, parent(A)
 end
 
@@ -59,13 +59,14 @@ end
 
 # Plots heatmaps pixels are centered. 
 # So we should center, and use the projected value.
-# Except GDAL will wrap values that are shifted around 180, and break
-# plotting. Not sure of a robust way to fix this - so just ploting
-# as is for now. The error is only visible on very small arrays.
-preparedim(d) = userval(d) # shiftindexloci(Center(), d) |> userval
+prepare(d::Dimension) = shiftindexloci(Center(), d) |> _maybemappedindex
 
 # Convert arrays to a consistent missing value and Forward array order
-prepare(A) = A |> maybereplace_missing |> forwardorder
+prepare(A::AbstractGeoArray) = A |> _maybereplace_missing |> forwardorder
 
-maybereplace_missing(A::AbstractArray{<:AbstractFloat}) = replace_missing(A, NaN)
-maybereplace_missing(A) = A
+_maybereplace_missing(A::AbstractArray{<:AbstractFloat}) = replace_missing(A, NaN)
+_maybereplace_missing(A) = A
+
+_maybemappedindex(dim::Dimension) = _maybemappedindex(mappedcrs(dim), dim)
+_maybemappedindex(::Nothing, dim::Dimension) = index(dim)
+_maybemappedindex(::GeoFormat, dim::Dimension) = mappedindex(dim)
