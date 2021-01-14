@@ -6,17 +6,19 @@ const GeoDim = Union{GeoXDim,GeoYDim,GeoZDim}
 # We only look at arrays with GeoDims here.
 # Otherwise they fall back to DimensionalData.jl recipes
 @recipe function f(A::AbstractGeoArray)
+    ddplot(A) = A |> a -> DimArray(a; dims=_maybe_mapped(dims(a)))
+
     A = GeoArray(A)
-    if all(hasdim(A, (GeoDim, GeoDim)))
+    if !(get(plotattributes, :seriestype, :none) in (:none, :heatmap))
+        DD.DimensionalPlot(), ddplot(A)
+    elseif all(hasdim(A, (GeoDim, GeoDim)))
         # Heatmap or multiple heatmaps. Use GD recipes.
         GeoPlot(), _prepare(A)
-    elseif hasdim(A, GeoZDim)
+    elseif hasdim(A, GeoZDim) && ndims(A) == 1
         # Z dim plot, but for spatial data we want Z on the Y axis
         GeoZPlot(), _prepare(A)
     else
-        # Not a GeoDim heatmap. Fall back to DD recipes after reprojecting.
-        da = A |> GeoArray |> a -> DimArray(a; dims=_maybe_mapped(dims(a)))
-        DD.DimensionalPlot(), da
+        DD.DimensionalPlot(), ddplot(A)
     end
 end
 
@@ -28,20 +30,16 @@ end
         :title --> permutedims(string.(val(dims(A, D))))
         for i in 1:nplots
             @series begin
-                seriestype := :heatmap
-                aspect_ratio := 1
+                # aspect_ratio := 1
                 subplot := i
-                slice = A[:, :, i]
-                x1, x2 = map(_prepare, dims(slice))
-                x1, x2, parent(slice)
+                GeoPlot(), A[:, :, i]
             end
         end
     else
         GeoPlot(), A[:, :, 1]
     end
 end
-
-# # Plot a sinlge 2d map
+# Plot a sinlge 2d map
 @recipe function f(::GeoPlot, A::GeoArray{T,2,<:Tuple{<:GeoDim,<:GeoDim}}) where T
     # If colorbar is close to symmetric (< 25% difference) use a symmetric 
     # colormap and set symmetric limits so zero shows up as a neutral color.
@@ -53,8 +51,6 @@ end
     else
         clims = A_min, A_max
     end
-
-    # clims = get(plotattributes, :clims, clims)
 
     if get(plotattributes, :seriestype, :none) == :contourf
         :linewidth --> 0
@@ -85,8 +81,7 @@ end
     z_dim = dims(A, ZDim)
     yguide = label(z_dim)
     xguide = label(A)
-
-    :title --> "$(name(A)): $(DD._refdims_title(A))"
+    :title --> "$(_maybename(name(A)))$(DD._refdims_title(A))"
     :xguide --> xguide
     :yguide --> yguide
     :label --> ""
@@ -102,7 +97,10 @@ _prepare(A::AbstractGeoArray) =
     _maybe_replace_missing(A) |>
     A -> reorder(A, ForwardIndex) |>
     A -> reorder(A, ForwardRelation) |>
-    A -> permutedims(A, DD.commondims((GeoXDim, GeoYDim, GeoZDim, TimeDim, Dimension), dims(A); op=(>:)))
+    A -> permutedims(A, DD.commondims(>:, (GeoXDim, GeoYDim, GeoZDim, TimeDim, Dimension), dims(A)))
+
+_maybename(n::Symbol) = n == Symbol("") ? "" : string(n, ": ")
+_maybename(n::NoName) = ""
 
 _maybe_replace_missing(A::AbstractArray{<:AbstractFloat}) = replace_missing(A, eltype(A)(NaN))
 _maybe_replace_missing(A) = A
